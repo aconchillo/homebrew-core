@@ -22,6 +22,7 @@ class Gtkx3 < Formula
   depends_on "meson" => :build
   depends_on "ninja" => :build
   depends_on "pkg-config" => :build
+  depends_on "adwaita-icon-theme"
   depends_on "atk"
   depends_on "gdk-pixbuf"
   depends_on "glib"
