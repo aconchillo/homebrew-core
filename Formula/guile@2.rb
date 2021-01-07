@@ -51,6 +51,14 @@ class GuileAT2 < Formula
     end
 
     (share/"gdb/auto-load").install Dir["#{lib}/*-gdb.scm"]
+
+    # Some tools still look for guile-GUILE_EFFECTIVE_VERSION, so create the
+    # links for Guile 2.2.
+    bin.install_symlink "guile" => "guile-2.2"
+    bin.install_symlink "guild" => "guild-2.2"
+    bin.install_symlink "guile-config" => "guile-config-2.2"
+    bin.install_symlink "guile-snarf" => "guile-snarf-2.2"
+    bin.install_symlink "guile-tools" => "guile-tools-2.2"
   end
 
   test do

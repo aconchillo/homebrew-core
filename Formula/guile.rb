@@ -72,6 +72,14 @@ class Guile < Formula
     end
 
     (share/"gdb/auto-load").install Dir["#{lib}/*-gdb.scm"]
+
+    # Some tools still look for guile-GUILE_EFFECTIVE_VERSION, so create the
+    # links for Guile 3.
+    bin.install_symlink "guile" => "guile-3.0"
+    bin.install_symlink "guild" => "guild-3.0"
+    bin.install_symlink "guile-config" => "guile-config-3.0"
+    bin.install_symlink "guile-snarf" => "guile-snarf-3.0"
+    bin.install_symlink "guile-tools" => "guile-tools-3.0"
   end
 
   def post_install
