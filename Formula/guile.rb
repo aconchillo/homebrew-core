@@ -72,6 +72,18 @@ class Guile < Formula
     end
 
     (share/"gdb/auto-load").install Dir["#{lib}/*-gdb.scm"]
+
+    # Guile allows multiple versions to run in parallel.
+    # Install versioned symlinks in libexec/bin.
+    {
+      "guile"        => "guile-3.0",
+      "guild"        => "guild-3.0",
+      "guile-config" => "guile-config-3.0",
+      "guile-snarf"  => "guile-snarf-3.0",
+      "guile-tools"  => "guile-tools-3.0",
+    }.each do |unversioned_name, versioned_name|
+      (libexec/"bin").install_symlink (bin/unversioned_name).realpath => versioned_name
+    end
   end
 
   def post_install
@@ -83,7 +95,14 @@ class Guile < Formula
 
   def caveats
     <<~EOS
-      Guile libraries can now be installed here:
+      Guile has been installed as
+        #{opt_bin}/guile
+
+      Versioned symlinks `guile-3.0`, `guild-3.0`, `guile-config-3.0` etc. pointing to
+      `guile`, `guild`, `guile-config` etc., respectively, have been installed into
+        #{opt_libexec}/bin
+
+      User guile libraries can now be installed here:
           Source files: #{HOMEBREW_PREFIX}/share/guile/site/3.0
         Compiled files: #{HOMEBREW_PREFIX}/lib/guile/3.0/site-ccache
             Extensions: #{HOMEBREW_PREFIX}/lib/guile/3.0/extensions

@@ -51,6 +51,34 @@ class GuileAT2 < Formula
     end
 
     (share/"gdb/auto-load").install Dir["#{lib}/*-gdb.scm"]
+
+    # Guile allows multiple versions to run in parallel.
+    # Install versioned symlinks in libexec/bin.
+    {
+      "guile"        => "guile-2.2",
+      "guild"        => "guild-2.2",
+      "guile-config" => "guile-config-2.2",
+      "guile-snarf"  => "guile-snarf-2.2",
+      "guile-tools"  => "guile-tools-2.2",
+    }.each do |unversioned_name, versioned_name|
+      (libexec/"bin").install_symlink (bin/unversioned_name).realpath => versioned_name
+    end
+  end
+
+  def caveats
+    <<~EOS
+      Guile has been installed as
+        #{opt_bin}/guile
+
+      Versioned symlinks `guile-2.2`, `guild-2.2`, `guile-config-2.2` etc. pointing to
+      `guile`, `guild`, `guile-config` etc., respectively, have been installed into
+        #{opt_libexec}/bin
+
+      Guile libraries are installed here:
+          Source files: #{opt_share}/guile/site/2.2
+        Compiled files: #{opt_lib}/guile/2.2/ccache
+            Extensions: #{opt_lib}/guile/2.2/extensions
+    EOS
   end
 
   test do
