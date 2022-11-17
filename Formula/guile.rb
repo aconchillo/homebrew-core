@@ -1,11 +1,24 @@
 class Guile < Formula
   desc "GNU Ubiquitous Intelligent Language for Extensions"
   homepage "https://www.gnu.org/software/guile/"
-  url "https://ftp.gnu.org/gnu/guile/guile-3.0.8.tar.xz"
-  mirror "https://ftpmirror.gnu.org/guile/guile-3.0.8.tar.xz"
-  sha256 "daa7060a56f2804e9b74c8d7e7fe8beed12b43aab2789a38585183fcc17b8a13"
   license "LGPL-3.0-or-later"
-  revision 2
+  revision 3
+
+  stable do
+    url "https://ftp.gnu.org/gnu/guile/guile-3.0.8.tar.xz"
+    mirror "https://ftpmirror.gnu.org/guile/guile-3.0.8.tar.xz"
+    sha256 "daa7060a56f2804e9b74c8d7e7fe8beed12b43aab2789a38585183fcc17b8a13"
+
+    patch do
+      # A patch to fix JIT on Apple Silicon is embedded below, this fixes:
+      #   https://debbugs.gnu.org/cgi/bugreport.cgi?bug=44505
+      # We should remove it from here once Guile 3.0.9 is released.
+      on_macos do
+        url "https://git.savannah.gnu.org/cgit/guile.git/patch/?id=3bdcc3668fd8f9a5b6c9a313ff8d70acb32b2a52"
+        sha256 "3deeb4c01059615df97081e53056c76bcc465030aaaaf01f5941fbea4d16cb6f"
+      end
+    end
+  end
 
   bottle do
     sha256 arm64_ventura:  "c3d30012c9169556511cdf762f9c4c98dd7eca3c0ba510dac1a8ef1c14e9927a"
@@ -27,6 +40,11 @@ class Guile < Formula
     uses_from_macos "flex" => :build
   end
 
+  # Remove with Guile 3.0.9 release.
+  depends_on "autoconf" => :build
+  depends_on "automake" => :build
+  depends_on "gettext" => :build
+
   depends_on "gnu-sed" => :build
   depends_on "bdw-gc"
   depends_on "gmp"
@@ -34,6 +52,9 @@ class Guile < Formula
   depends_on "libunistring"
   depends_on "pkg-config" # guile-config is a wrapper around pkg-config.
   depends_on "readline"
+
+  # Remove with Guile 3.0.9 release.
+  uses_from_macos "flex" => :build
 
   uses_from_macos "gperf"
   uses_from_macos "libffi", since: :catalina
@@ -45,16 +66,14 @@ class Guile < Formula
 
     system "./autogen.sh" unless build.stable?
 
-    # Disable JIT on Apple Silicon, as it is not yet supported
-    # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=44505
-    extra_args = []
-    extra_args << "--enable-jit=no" if Hardware::CPU.arm?
+    # Remove with Guile 3.0.9 release.
+    system "autoreconf", "-vif" if OS.mac? && build.stable?
 
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
                           "--with-libreadline-prefix=#{Formula["readline"].opt_prefix}",
                           "--with-libgmp-prefix=#{Formula["gmp"].opt_prefix}",
-                          *extra_args
+                          "--disable-nls"
     system "make", "install"
 
     # A really messed up workaround required on macOS --mkhl
