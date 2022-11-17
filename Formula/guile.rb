@@ -5,7 +5,7 @@ class Guile < Formula
   mirror "https://ftpmirror.gnu.org/guile/guile-3.0.8.tar.xz"
   sha256 "daa7060a56f2804e9b74c8d7e7fe8beed12b43aab2789a38585183fcc17b8a13"
   license "LGPL-3.0-or-later"
-  revision 2
+  revision 3
 
   bottle do
     sha256 arm64_ventura:  "c3d30012c9169556511cdf762f9c4c98dd7eca3c0ba510dac1a8ef1c14e9927a"
@@ -27,6 +27,12 @@ class Guile < Formula
     uses_from_macos "flex" => :build
   end
 
+  ### Remove after configure.ac patch is not necessary anymore.
+  depends_on "autoconf" => :build
+  depends_on "automake" => :build
+  depends_on "gettext" => :build
+  ###
+
   depends_on "gnu-sed" => :build
   depends_on "bdw-gc"
   depends_on "gmp"
@@ -35,26 +41,38 @@ class Guile < Formula
   depends_on "pkg-config" # guile-config is a wrapper around pkg-config.
   depends_on "readline"
 
+  ### Remove after configure.ac patch is not necessary anymore.
+  uses_from_macos "flex" => :build
+  ###
+
   uses_from_macos "gperf"
   uses_from_macos "libffi", since: :catalina
   uses_from_macos "libxcrypt"
+
+  on_macos do
+    # A patch to fix JIT on Apple Silicon is embedded below, this fixes:
+    #   https://debbugs.gnu.org/cgi/bugreport.cgi?bug=44505
+    # The patch has not been yet reviewed/accepted upstream, but when it
+    # does we should remove it from here.
+    #   https://lists.gnu.org/archive/html/guile-devel/2022-11/msg00017.html
+    patch :DATA
+  end
 
   def install
     # Avoid superenv shim
     inreplace "meta/guile-config.in", "@PKG_CONFIG@", Formula["pkg-config"].opt_bin/"pkg-config"
 
-    system "./autogen.sh" unless build.stable?
-
-    # Disable JIT on Apple Silicon, as it is not yet supported
-    # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=44505
-    extra_args = []
-    extra_args << "--enable-jit=no" if Hardware::CPU.arm?
+    if OS.mac?
+      # We need to regenerate ./configure because we just patched configure.ac.
+      system "autoreconf", "-vif"
+    else
+      system "./autogen.sh" unless build.stable?
+    end
 
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
                           "--with-libreadline-prefix=#{Formula["readline"].opt_prefix}",
-                          "--with-libgmp-prefix=#{Formula["gmp"].opt_prefix}",
-                          *extra_args
+                          "--with-libgmp-prefix=#{Formula["gmp"].opt_prefix}"
     system "make", "install"
 
     # A really messed up workaround required on macOS --mkhl
@@ -107,3 +125,83 @@ class Guile < Formula
     system bin/"guile", hello
   end
 end
+
+__END__
+diff --git a/configure.ac b/configure.ac
+index b3879df1f..f8c12f0d7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1187,6 +1187,9 @@ case "$with_threads" in
+       pthread_get_stackaddr_np pthread_attr_get_np pthread_sigmask	\
+       pthread_cancel])
+ 
++    # Apple Silicon JIT code arena needs to be unprotected before writing.
++    AC_CHECK_FUNCS([pthread_jit_write_protect_np])
++
+     # On past versions of Solaris, believe 8 through 10 at least, you
+     # had to write "pthread_once_t foo = { PTHREAD_ONCE_INIT };".
+     # This is contrary to POSIX:
+diff --git a/libguile/jit.c b/libguile/jit.c
+index 8420829b4..5cef8fae3 100644
+--- a/libguile/jit.c
++++ b/libguile/jit.c
+@@ -47,6 +47,10 @@
+ #include <sys/mman.h>
+ #endif
+ 
++#if defined __APPLE__ && HAVE_PTHREAD_JIT_WRITE_PROTECT_NP
++#include <libkern/OSCacheControl.h>
++#endif
++
+ #include "jit.h"
+ 
+ 
+@@ -1349,9 +1353,13 @@ allocate_code_arena (size_t size, struct code_arena *prev)
+   ret->size = size;
+   ret->prev = prev;
+ #ifndef __MINGW32__
++  int flags = MAP_PRIVATE | MAP_ANONYMOUS;
++#if defined __APPLE__ && HAVE_PTHREAD_JIT_WRITE_PROTECT_NP
++  flags |= MAP_JIT;
++#endif
+   ret->base = mmap (NULL, ret->size,
+                     PROT_EXEC | PROT_READ | PROT_WRITE,
+-                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++                    flags, -1, 0);
+   if (ret->base == MAP_FAILED)
+     {
+       perror ("allocating JIT code buffer failed");
+@@ -1406,11 +1414,21 @@ emit_code (scm_jit_state *j, void (*emit) (scm_jit_state *))
+ 
+       uint8_t *ret = jit_address (j->jit);
+ 
++#if defined __APPLE__ && HAVE_PTHREAD_JIT_WRITE_PROTECT_NP
++      pthread_jit_write_protect_np(0);
++#endif
++
+       emit (j);
+ 
+       size_t size;
+       if (!jit_has_overflow (j->jit) && jit_end (j->jit, &size))
+         {
++#if defined __APPLE__ && HAVE_PTHREAD_JIT_WRITE_PROTECT_NP
++          /* protect previous code arena. leave unprotected after emit()
++             since jit_end() also writes to code arena. */
++          pthread_jit_write_protect_np(1);
++          sys_icache_invalidate(arena->base, arena->size);
++#endif
+           ASSERT (size <= (arena->size - arena->used));
+           DEBUG ("mcode: %p,+%zu\n", ret, size);
+           arena->used += size;
+@@ -1424,6 +1442,11 @@ emit_code (scm_jit_state *j, void (*emit) (scm_jit_state *))
+         }
+       else
+         {
++#if defined __APPLE__ && HAVE_PTHREAD_JIT_WRITE_PROTECT_NP
++          /* protect previous code arena */
++          pthread_jit_write_protect_np(1);
++          sys_icache_invalidate(arena->base, arena->size);
++#endif
+           jit_reset (j->jit);
+           if (arena->used == 0)
+             {
