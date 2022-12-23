@@ -69,8 +69,7 @@ class Guile < Formula
     # Remove with Guile 3.0.9 release.
     system "autoreconf", "-vif" if OS.mac? && build.stable?
 
-    system "./configure", "--disable-dependency-tracking",
-                          "--prefix=#{prefix}",
+    system "./configure", *std_configure_args,
                           "--with-libreadline-prefix=#{Formula["readline"].opt_prefix}",
                           "--with-libgmp-prefix=#{Formula["gmp"].opt_prefix}",
                           "--disable-nls"
