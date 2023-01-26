@@ -25,11 +25,6 @@ class Guile < Formula
     uses_from_macos "flex" => :build
   end
 
-  # Remove with Guile 3.0.9 release.
-  depends_on "autoconf" => :build
-  depends_on "automake" => :build
-  depends_on "gettext" => :build
-
   depends_on "gnu-sed" => :build
   depends_on "bdw-gc"
   depends_on "gmp"
@@ -37,9 +32,6 @@ class Guile < Formula
   depends_on "libunistring"
   depends_on "pkg-config" # guile-config is a wrapper around pkg-config.
   depends_on "readline"
-
-  # Remove with Guile 3.0.9 release.
-  uses_from_macos "flex" => :build
 
   uses_from_macos "gperf"
   uses_from_macos "libffi", since: :catalina
@@ -50,9 +42,6 @@ class Guile < Formula
     inreplace "meta/guile-config.in", "@PKG_CONFIG@", Formula["pkg-config"].opt_bin/"pkg-config"
 
     system "./autogen.sh" unless build.stable?
-
-    # Remove with Guile 3.0.9 release.
-    system "autoreconf", "-vif" if OS.mac? && build.stable?
 
     system "./configure", *std_configure_args,
                           "--with-libreadline-prefix=#{Formula["readline"].opt_prefix}",
