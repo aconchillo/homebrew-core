@@ -2,6 +2,7 @@ class Gstreamer < Formula
   desc "Development framework for multimedia applications"
   homepage "https://gstreamer.freedesktop.org/"
   license all_of: ["LGPL-2.0-or-later", "LGPL-2.1-or-later", "MIT"]
+  revision 1
 
   stable do
     url "https://gitlab.freedesktop.org/gstreamer/gstreamer/-/archive/1.22.9/gstreamer-1.22.9.tar.gz"
@@ -62,6 +63,7 @@ class Gstreamer < Formula
   depends_on "jpeg-turbo"
   depends_on "json-glib"
   depends_on "lame"
+  depends_on "libnice"
   depends_on "libogg"
   depends_on "libpng"
   depends_on "libpthread-stubs"
@@ -202,6 +204,11 @@ class Gstreamer < Formula
   def caveats
     <<~EOS
       All gst-* GStreamer plugins are now bundled in this formula.
+
+      GStreamer plugins are located in `#{HOMEBREW_PREFIX}/lib/gstreamer-1.0`
+      and `GST_PLUGIN_SYSTEM_PATH` needs to be set accordingly:
+        export GST_PLUGIN_SYSTEM_PATH="#{HOMEBREW_PREFIX}/lib/gstreamer-1.0"
+
       For GStreamer to find your own plugins, add their paths to `GST_PLUGIN_PATH`.
       For example, if you have plugins in `~/.local/lib/gstreamer-1.0`:
         export GST_PLUGIN_PATH="~/.local/lib/gstreamer-1.0"
